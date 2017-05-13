@@ -1,44 +1,20 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"github.com/gorilla/context"
 	"github.com/gorilla/sessions"
 	"net/http"
 )
 
-type Response struct {
-	Error string `json:"error,omitempty"`
-	Title string `json:"title,omitempty"`
-}
-
 var store = sessions.NewCookieStore([]byte("my-cookie-secret"))
 
-func (resp *Response) send(w http.ResponseWriter) {
-	responseJson, err := json.Marshal(resp)
-	if err != nil {
-		responseCode := http.StatusInternalServerError
-		responseJson = []byte(fmt.Sprintf("{ \"error\": \"%v\" }", err))
-		w.WriteHeader(responseCode)
-	}
-	fmt.Fprintf(w, "%s", string(responseJson))
-}
-
-func (resp *Response) sendError(w http.ResponseWriter, rErr string, responseCode int) {
-	resp.Error = rErr
-	w.WriteHeader(responseCode)
-	resp.send(w)
-}
-
 func saveSession(w http.ResponseWriter, r *http.Request) {
-	resp := Response{
-		Title: "This is part of the body",
-	}
+	resp := make(Response)
+	resp["title"] = "This is part of the body"
 
 	session, err := store.Get(r, "session-A")
 	if err != nil {
-		resp.sendError(w, err.Error(), http.StatusInternalServerError)
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -47,24 +23,25 @@ func saveSession(w http.ResponseWriter, r *http.Request) {
 
 	err = sessions.Save(r, w)
 	if err != nil {
-		resp.sendError(w, err.Error(), http.StatusInternalServerError)
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	resp.send(w)
+	resp.jSend(w)
 }
 
 func readSession(w http.ResponseWriter, r *http.Request) {
-	resp := Response{}
+	resp := make(Response)
 
 	session, err := store.Get(r, "session-A")
 	if err != nil {
-		resp.sendError(w, err.Error(), http.StatusInternalServerError)
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	resp.Title = session.Values["val1"].(string)
-	resp.send(w)
+	resp["cookieVal1"] = session.Values["val1"].(string)
+	resp["cookieVal2"] = session.Values["val2"].(string)
+	resp.jSend(w)
 }
 
 func setRoutes() {
