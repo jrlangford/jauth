@@ -31,15 +31,21 @@ func generateSecureRandomBytes(n int) (string, error) {
 	return out, nil
 }
 
-func createUser(w http.ResponseWriter, r *http.Request) {
+func postUser(w http.ResponseWriter, r *http.Request) {
 	resp := make(Response)
 
 	decoder := json.NewDecoder(r.Body)
 	var data UserInfo
 	err := decoder.Decode(&data)
 	if err != nil {
-		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-		return
+		switch err.Error() {
+		case "EOF":
+			resp.jSendError(w, "No body in request", http.StatusBadRequest)
+			return
+		default:
+			resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	defer r.Body.Close()
 
@@ -52,7 +58,7 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//TODO validate password
+	//TODO validate password complies with security standards
 
 	salt, err := generateSecureRandomBytes(saltLength)
 	if err != nil {
@@ -78,13 +84,27 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 		data.IsDisabled,
 	).Scan(&lastInsertId)
 	if err != nil {
-		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-		return
+		switch err.Error() {
+		case "pq: duplicate key value violates unique constraint \"user_info_email_key\"":
+			resp.jSendError(w, "Email already registered", http.StatusConflict)
+			return
+		default:
+			resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
-	resp["id"] = lastInsertId
+	resp["status"] = "ok"
 
 	resp.jSend(w)
+}
+
+func getUser(w http.ResponseWriter, r *http.Request) {
+	//Read request parameters
+	//Validate request
+	//Process request
+	//Respond
+
 }
 
 func saveSession(w http.ResponseWriter, r *http.Request) {
