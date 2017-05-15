@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	_ "github.com/lib/pq"
@@ -25,28 +24,21 @@ func generateSecureRandomBytes(n int) (string, error) {
 }
 
 func postUser(w http.ResponseWriter, r *http.Request) {
-	resp := make(Response)
 
-	decoder := json.NewDecoder(r.Body)
 	var data struct {
-		Email      string `json:"email,omitempty"`
-		Username   string `json:"username,omitempty"`
-		Fullname   string `json:"fullname,omitempty"`
-		Password   string `json:"password,omitempty"`
-		IsDisabled bool   `json:"isdisabled,omitempty"`
+		Email      string `json:"email"`
+		Username   string `json:"username"`
+		Fullname   string `json:"fullname"`
+		Password   string `json:"password"`
+		IsDisabled bool   `json:"isdisabled"`
 	}
-	err := decoder.Decode(&data)
+
+	err := bodyToJson(w, r, &data)
 	if err != nil {
-		switch err.Error() {
-		case "EOF":
-			resp.jSendError(w, "No body in request", http.StatusBadRequest)
-			return
-		default:
-			resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		return
 	}
-	defer r.Body.Close()
+
+	resp := make(Response)
 
 	if data.Email == "" ||
 		data.Username == "" ||
@@ -61,17 +53,19 @@ func postUser(w http.ResponseWriter, r *http.Request) {
 
 	salt, err := generateSecureRandomBytes(saltLength)
 	if err != nil {
-		// TODO: Do not propagate critical error data to client
-		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("err: postUser: %s", err.Error())
+		resp.jSendError(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	log.Printf("Salt: %v", salt)
 
 	saltedPassword := salt + data.Password
 
-	log.Printf("SaltedPass: %s", string(saltedPassword))
-
 	hash, err := bcrypt.GenerateFromPassword([]byte(saltedPassword), bcrypt.DefaultCost)
+	if err != nil {
+		log.Printf("err: postUser: %s", err.Error())
+		resp.jSendError(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 
 	_, err = db.Exec("insert into user_info (email, username, fullname, passwordhash, passwordsalt, isdisabled) values ($1, $2, $3, $4, $5, $6);",
 		data.Email,
@@ -98,14 +92,20 @@ func postUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func getUserByEmail(w http.ResponseWriter, r *http.Request) {
-
-	//Read request parameters
-	//Validate request
-	//Process request
-	//Respond
-
 	vars := mux.Vars(r)
 	resp := make(Response)
+
+	session, err := store.Get(r, "jdata")
+	if err != nil {
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if session.Values["logged"] != "true" &&
+		session.Values["accessLevel"] != "user" {
+		resp.jSendError(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
 
 	if vars["email"] == "" {
 		resp.jSendError(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -118,7 +118,7 @@ func getUserByEmail(w http.ResponseWriter, r *http.Request) {
 		Fullname   string `json:"fullname"`
 		Isdisabled bool   `json:"isdisabled"`
 	}
-	err := db.QueryRow("select email, username, fullname, isdisabled from user_info where email = $1;",
+	err = db.QueryRow("select email, username, fullname, isdisabled from user_info where email = $1;",
 		vars["email"],
 	).Scan(&qResp.Email,
 		&qResp.Username,
@@ -132,9 +132,82 @@ func getUserByEmail(w http.ResponseWriter, r *http.Request) {
 
 	resp["userinfo"] = qResp
 	resp.jSend(w)
+}
 
-	//Query DB for user with given email
+func logIn(w http.ResponseWriter, r *http.Request) {
+	//Read request parameters
+	var data struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
 
+	err := bodyToJson(w, r, &data)
+	if err != nil {
+		return
+	}
+
+	resp := make(Response)
+
+	//Validate data
+	if data.Email == "" ||
+		data.Password == "" {
+		resp.jSendError(w, "Invalid attribute values", http.StatusBadRequest)
+		return
+	}
+
+	//Process request
+	var qResp struct {
+		Username   string
+		Hash       string
+		Salt       string
+		Isdisabled bool
+	}
+	err = db.QueryRow("select username, passwordhash, passwordsalt, isdisabled from user_info where email = $1;",
+		data.Email,
+	).Scan(&qResp.Username,
+		&qResp.Hash,
+		&qResp.Salt,
+		&qResp.Isdisabled,
+	)
+	if err != nil {
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	//TODO route to special page if user is disabled
+
+	saltedPassword := qResp.Salt + data.Password
+
+	err = bcrypt.CompareHashAndPassword([]byte(qResp.Hash), []byte(saltedPassword))
+	if err != nil {
+		switch err {
+		case bcrypt.ErrMismatchedHashAndPassword:
+			resp.jSendError(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		default:
+			log.Printf("err: logIn: %s", err.Error())
+			resp.jSendError(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		return
+	}
+	session, err := store.Get(r, "jdata")
+	if err != nil {
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	session.Values["accessLevel"] = "user"
+	session.Values["logged"] = "true"
+	session.Values["language"] = "en-us"
+
+	log.Printf("Session: %v", session)
+
+	err = sessions.Save(r, w)
+	if err != nil {
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp["status"] = "ok"
+	resp.jSend(w)
 }
 
 func saveSession(w http.ResponseWriter, r *http.Request) {

@@ -26,6 +26,8 @@ func initRouter() {
 	r.HandleFunc("/users", postUser).Methods("POST")
 	//TODO limit endpoint access to logged in admins
 	r.HandleFunc("/users/email/{email}", getUserByEmail).Methods("GET")
+
+	r.HandleFunc("/login", logIn).Methods("POST")
 }
 
 func safePing(db *sql.DB) {
