@@ -210,6 +210,25 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	resp.jSend(w)
 }
 
+func logOut(w http.ResponseWriter, r *http.Request) {
+	resp := make(Response)
+	session, err := store.Get(r, "jdata")
+	if err != nil {
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	session.Options.MaxAge = -1
+
+	err = sessions.Save(r, w)
+	if err != nil {
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp["status"] = "ok"
+	resp.jSend(w)
+}
+
 func saveSession(w http.ResponseWriter, r *http.Request) {
 	resp := make(Response)
 	resp["title"] = "This is part of the body"

@@ -17,6 +17,10 @@ function log_in_bad_data {
 	curl -v -XPOST --header "Content-Type: application/json" -d @$DATA_DIR/badLoginData.json localhost:8080/login
 }
 
+function log_out {
+	curl -v -XPOST -b mycookie localhost:8080/logout
+}
+
 function get_user_data {
 	curl -v -b mycookie localhost:8080/users/email/jrobin@gmail.com
 }

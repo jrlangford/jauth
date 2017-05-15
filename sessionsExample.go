@@ -28,6 +28,7 @@ func initRouter() {
 	r.HandleFunc("/users/email/{email}", getUserByEmail).Methods("GET")
 
 	r.HandleFunc("/login", logIn).Methods("POST")
+	r.HandleFunc("/logout", logOut).Methods("POST")
 }
 
 func safePing(db *sql.DB) {
