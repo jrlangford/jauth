@@ -22,7 +22,7 @@ func initRouter() {
 
 	r.HandleFunc("/cookie/save", saveSession)
 	r.HandleFunc("/cookie/read", readSession)
-	r.HandleFunc("/user/create", postUser)
+	r.HandleFunc("/user", postUser).Methods("POST")
 }
 
 func safePing(db *sql.DB) {
