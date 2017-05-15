@@ -12,14 +12,6 @@ import (
 	"net/http"
 )
 
-type UserInfo struct {
-	Email      string `json:"email,omitempty"`
-	Username   string `json:"username,omitempty"`
-	Fullname   string `json:"fullname,omitempty"`
-	Password   string `json:"password,omitempty"`
-	IsDisabled bool   `json:"isdisabled,omitempty"`
-}
-
 const saltLength = 32
 
 func generateSecureRandomBytes(n int) (string, error) {
@@ -36,7 +28,13 @@ func postUser(w http.ResponseWriter, r *http.Request) {
 	resp := make(Response)
 
 	decoder := json.NewDecoder(r.Body)
-	var data UserInfo
+	var data struct {
+		Email      string `json:"email,omitempty"`
+		Username   string `json:"username,omitempty"`
+		Fullname   string `json:"fullname,omitempty"`
+		Password   string `json:"password,omitempty"`
+		IsDisabled bool   `json:"isdisabled,omitempty"`
+	}
 	err := decoder.Decode(&data)
 	if err != nil {
 		switch err.Error() {
@@ -114,20 +112,25 @@ func getUserByEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u UserInfo
+	var qResp struct {
+		Email      string `json:"email"`
+		Username   string `json:"username"`
+		Fullname   string `json:"fullname"`
+		Isdisabled bool   `json:"isdisabled"`
+	}
 	err := db.QueryRow("select email, username, fullname, isdisabled from user_info where email = $1;",
 		vars["email"],
-	).Scan(&u.Email,
-		&u.Username,
-		&u.Fullname,
-		&u.IsDisabled,
+	).Scan(&qResp.Email,
+		&qResp.Username,
+		&qResp.Fullname,
+		&qResp.Isdisabled,
 	)
 	if err != nil {
 		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	resp["userinfo"] = u
+	resp["userinfo"] = qResp
 	resp.jSend(w)
 
 	//Query DB for user with given email
