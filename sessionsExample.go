@@ -18,6 +18,9 @@ var db *sql.DB
 var r *mux.Router
 
 func initRouter() {
+
+	usersAndAdmins := []string{"user", "admin"}
+
 	r = mux.NewRouter()
 
 	r.HandleFunc("/cookie/save", saveSession)
@@ -29,6 +32,9 @@ func initRouter() {
 
 	r.HandleFunc("/login", logIn).Methods("POST")
 	r.HandleFunc("/logout", logOut).Methods("POST")
+
+	http.Handle("/", r)
+	http.Handle("/logout", auth(r, usersAndAdmins))
 }
 
 func safePing(db *sql.DB) {
@@ -86,5 +92,5 @@ func main() {
 		os.Exit(0)
 	}()
 
-	http.ListenAndServe(":8080", r)
+	http.ListenAndServe(":8080", nil)
 }
