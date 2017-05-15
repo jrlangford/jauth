@@ -135,18 +135,36 @@ func getUserByEmail(w http.ResponseWriter, r *http.Request) {
 }
 
 func logIn(w http.ResponseWriter, r *http.Request) {
+	//Verify user is not already logged in
+	resp := make(Response)
+
+	session, err := store.Get(r, "jdata")
+	if err != nil {
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if session.Values["logged"] == "true" {
+		err = sessions.Save(r, w)
+		if err != nil {
+			resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp["status"] = "already logged"
+		resp.jSend(w)
+		return
+	}
+
 	//Read request parameters
 	var data struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 
-	err := bodyToJson(w, r, &data)
+	err = bodyToJson(w, r, &data)
 	if err != nil {
 		return
 	}
-
-	resp := make(Response)
 
 	//Validate data
 	if data.Email == "" ||
@@ -188,7 +206,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	session, err := store.Get(r, "jdata")
+	session, err = store.Get(r, "jdata")
 	if err != nil {
 		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -217,11 +235,17 @@ func logOut(w http.ResponseWriter, r *http.Request) {
 		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	session.Options.MaxAge = -1
 
 	err = sessions.Save(r, w)
 	if err != nil {
 		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if session.Values["logged"] != "true" {
+		resp.jSendError(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 

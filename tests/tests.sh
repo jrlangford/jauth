@@ -10,7 +10,7 @@ function create_user_no_body {
 }
 
 function log_in {
-	curl -v -c mycookie --header "Content-Type: application/json" -d @$DATA_DIR/goodLoginData.json localhost:8080/login
+	curl -v -b mycookie -c mycookie --header "Content-Type: application/json" -d @$DATA_DIR/goodLoginData.json localhost:8080/login
 }
 
 function log_in_bad_data {

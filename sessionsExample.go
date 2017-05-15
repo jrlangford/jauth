@@ -3,8 +3,8 @@ package main
 import (
 	"database/sql"
 	"github.com/gorilla/mux"
-	"github.com/gorilla/sessions"
 	_ "github.com/lib/pq"
+	"gopkg.in/boj/redistore.v1"
 	"log"
 	"net/http"
 	"os"
@@ -13,7 +13,7 @@ import (
 
 //TODO load store keys from config file or env
 var fs = "/Users/jrobin/Documents/jProjects/go/src/bitbucket.com/jrlangford/sessionsExample"
-var store = sessions.NewFilesystemStore(fs, []byte("my-cookie-secret"))
+var store *redistore.RediStore
 var db *sql.DB
 var r *mux.Router
 
@@ -39,24 +39,26 @@ func safePing(db *sql.DB) {
 }
 
 func initDB() {
-	log.Println("Connecting to database")
 	var err error
 	db, err = sql.Open("postgres", "host=localhost user=postgres dbname=postgres password=postgrespass sslmode=disable")
 	if err != nil {
 		log.Fatal("DB ERR: " + err.Error())
 	}
-
-	log.Println("Testing db connection")
 	safePing(db)
 	log.Println("Db connection sucessful")
 }
 
 func initSessionStore() {
-	store.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   86400 * 7,
-		HttpOnly: true,
+	var err error
+	store, err = redistore.NewRediStore(10, "tcp", ":8000", "", []byte("secret-key"))
+	if err != nil {
+		log.Fatal("Store ERR: " + err.Error())
 	}
+	log.Println("Store connection sucessful")
+
+	const secondsInDay = 86400
+
+	store.SetMaxAge(secondsInDay * 7)
 }
 
 func main() {
@@ -74,6 +76,13 @@ func main() {
 			os.Exit(1)
 		}
 		log.Println("Db connection closed")
+
+		err = store.Close()
+		if err != nil {
+			log.Print(err.Error())
+			os.Exit(1)
+		}
+		log.Println("Store connection closed")
 		os.Exit(0)
 	}()
 
