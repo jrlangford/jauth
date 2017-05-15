@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
@@ -12,11 +13,11 @@ import (
 )
 
 type UserInfo struct {
-	Email      string `json:"email"`
-	Username   string `json:"username"`
-	Fullname   string `json:"fullname"`
-	Password   string `json:"password"`
-	IsDisabled bool   `json:"isdisabled"`
+	Email      string `json:"email,omitempty"`
+	Username   string `json:"username,omitempty"`
+	Fullname   string `json:"fullname,omitempty"`
+	Password   string `json:"password,omitempty"`
+	IsDisabled bool   `json:"isdisabled,omitempty"`
 }
 
 const saltLength = 32
@@ -74,15 +75,14 @@ func postUser(w http.ResponseWriter, r *http.Request) {
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(saltedPassword), bcrypt.DefaultCost)
 
-	var lastInsertId int
-	err = db.QueryRow("insert into user_info (email, username, fullname, passwordhash, passwordsalt, isdisabled) values ($1, $2, $3, $4, $5, $6) returning id;",
+	_, err = db.Exec("insert into user_info (email, username, fullname, passwordhash, passwordsalt, isdisabled) values ($1, $2, $3, $4, $5, $6);",
 		data.Email,
 		data.Username,
 		data.Fullname,
 		hash,
 		salt,
 		data.IsDisabled,
-	).Scan(&lastInsertId)
+	)
 	if err != nil {
 		switch err.Error() {
 		case "pq: duplicate key value violates unique constraint \"user_info_email_key\"":
@@ -99,11 +99,38 @@ func postUser(w http.ResponseWriter, r *http.Request) {
 	resp.jSend(w)
 }
 
-func getUser(w http.ResponseWriter, r *http.Request) {
+func getUserByEmail(w http.ResponseWriter, r *http.Request) {
+
 	//Read request parameters
 	//Validate request
 	//Process request
 	//Respond
+
+	vars := mux.Vars(r)
+	resp := make(Response)
+
+	if vars["email"] == "" {
+		resp.jSendError(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	var u UserInfo
+	err := db.QueryRow("select email, username, fullname, isdisabled from user_info where email = $1;",
+		vars["email"],
+	).Scan(&u.Email,
+		&u.Username,
+		&u.Fullname,
+		&u.IsDisabled,
+	)
+	if err != nil {
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp["userinfo"] = u
+	resp.jSend(w)
+
+	//Query DB for user with given email
 
 }
 

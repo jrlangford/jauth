@@ -22,7 +22,10 @@ func initRouter() {
 
 	r.HandleFunc("/cookie/save", saveSession)
 	r.HandleFunc("/cookie/read", readSession)
-	r.HandleFunc("/user", postUser).Methods("POST")
+
+	r.HandleFunc("/users", postUser).Methods("POST")
+	//TODO limit endpoint access to logged in admins
+	r.HandleFunc("/users/email/{email}", getUserByEmail).Methods("GET")
 }
 
 func safePing(db *sql.DB) {
