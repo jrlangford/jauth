@@ -10,7 +10,7 @@ function create_user_no_body {
 }
 
 function log_in {
-	curl -v -b mycookie -c mycookie --header "Content-Type: application/json" -d @$DATA_DIR/goodLoginData.json localhost:8080/login
+	curl -v -b /tmp/jcookie -c /tmp/jcookie --header "Content-Type: application/json" -d @$DATA_DIR/goodLoginData.json localhost:8080/login
 }
 
 function create_admin {
@@ -18,7 +18,7 @@ function create_admin {
 }
 
 function log_in_admin {
-	curl -v -b mycookie -c mycookie --header "Content-Type: application/json" -d @$DATA_DIR/adminLogin.json localhost:8080/login
+	curl -v -b /tmp/jcookie -c /tmp/jcookie --header "Content-Type: application/json" -d @$DATA_DIR/adminLogin.json localhost:8080/login
 }
 
 function log_in_bad_data {
@@ -26,12 +26,13 @@ function log_in_bad_data {
 }
 
 function log_out {
-	curl -v -XPOST -b mycookie localhost:8080/logout
+	curl -v -XPOST -b /tmp/jcookie localhost:8080/logout
 }
 
 function get_users {
-	curl -v -b mycookie localhost:8080/admins/users
+	curl -v -b /tmp/jcookie localhost:8080/admins/users
 }
 
 function get_user_by_email {
-	curl -v -b mycookie localhost:8080/admins/users/jrobin@gmail.com
+	curl -v -b /tmp/jcookie localhost:8080/admins/users/jrobin@gmail.com
+}
