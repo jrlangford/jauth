@@ -1,6 +1,10 @@
 # Sessions test
 
+## Multiple application support
+Redis is used as key storage backend. It locks any key being used, avoiding concurrency issues.
+
 ## Test service
+
 ### Get cookie
 curl -v -c cookie localhost:8080/cookie/save
 

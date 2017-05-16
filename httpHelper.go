@@ -25,7 +25,7 @@ func (resp *Response) jSendError(w http.ResponseWriter, rErr string, responseCod
 	resp.jSend(w)
 }
 
-func bodyToJson(w http.ResponseWriter, r *http.Request, data interface{}) (err error) {
+func decodeJsonBody(w http.ResponseWriter, r *http.Request, data interface{}) (err error) {
 
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()

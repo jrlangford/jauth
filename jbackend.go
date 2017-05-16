@@ -1,9 +1,9 @@
 package main
 
 import (
-	"database/sql"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
 	"gopkg.in/boj/redistore.v1"
 	"log"
@@ -13,7 +13,7 @@ import (
 )
 
 var store *redistore.RediStore
-var db *sql.DB
+var db *gorm.DB
 var r *mux.Router
 
 const cookieName = "jdata"
@@ -57,21 +57,23 @@ func initRouter() {
 
 }
 
-func safePing(db *sql.DB) {
-	_, err := db.Exec("SELECT 1")
+func safePing(db *gorm.DB) {
+	err := db.Exec("SELECT 1").Error
 	if err != nil {
 		log.Fatal("DB Ping Err: " + err.Error())
 	}
 }
 
-func initDB() {
+func initGDB() {
 	var err error
-	db, err = sql.Open("postgres", "host=localhost user=postgres dbname=postgres password=postgrespass sslmode=disable")
+	db, err = gorm.Open("postgres", "host=localhost user=postgres dbname=postgres password=postgrespass sslmode=disable")
 	if err != nil {
 		log.Fatal("DB ERR: " + err.Error())
 	}
 	safePing(db)
 	log.Println("Db connection sucessful")
+
+	db.AutoMigrate(&User{})
 }
 
 func initSessionStore() {
@@ -89,7 +91,7 @@ func initSessionStore() {
 
 func main() {
 	initSessionStore()
-	initDB()
+	initGDB()
 	initRouter()
 
 	sigchan := make(chan os.Signal, 1)
@@ -101,7 +103,7 @@ func main() {
 			log.Print(err.Error())
 			os.Exit(1)
 		}
-		log.Println("Db connection closed")
+		log.Println("Gdb connection closed")
 
 		err = store.Close()
 		if err != nil {

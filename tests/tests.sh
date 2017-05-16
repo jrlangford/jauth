@@ -35,4 +35,3 @@ function get_users {
 
 function get_user_by_email {
 	curl -v -b mycookie localhost:8080/admins/users/jrobin@gmail.com
-}

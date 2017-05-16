@@ -34,7 +34,7 @@ func postUser(w http.ResponseWriter, r *http.Request) {
 		IsDisabled bool   `json:"isdisabled"`
 	}
 
-	err := bodyToJson(w, r, &data)
+	err := decodeJsonBody(w, r, &data)
 	if err != nil {
 		return
 	}
@@ -72,24 +72,18 @@ func postUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = db.Exec("insert into user_info (email, username, fullname, passwordhash, passwordsalt, role, isdisabled) values ($1, $2, $3, $4, $5, $6, $7);",
-		data.Email,
-		data.Username,
-		data.Fullname,
-		hash,
-		salt,
-		data.Role,
-		data.IsDisabled,
-	)
-	if err != nil {
-		switch err.Error() {
-		case "pq: duplicate key value violates unique constraint \"user_info_email_key\"":
-			resp.jSendError(w, "Email already registered", http.StatusConflict)
-			return
-		default:
-			resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	u := User{
+		Email:        data.Email,
+		Username:     data.Username,
+		Fullname:     data.Fullname,
+		PasswordHash: string(hash),
+		PasswordSalt: salt,
+		Role:         data.Role,
+		IsDisabled:   data.IsDisabled,
+	}
+	if err := db.Create(&u).Error; err != nil {
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	resp["status"] = "ok"
@@ -106,65 +100,28 @@ func getUserByEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var qResp struct {
-		Email      string `json:"email"`
-		Username   string `json:"username"`
-		Fullname   string `json:"fullname"`
-		Role       string `json:"role"`
-		Isdisabled bool   `json:"isdisabled"`
-	}
-	err := db.QueryRow("select email, username, fullname, role, isdisabled from user_info where email = $1;",
-		vars["email"],
-	).Scan(&qResp.Email,
-		&qResp.Username,
-		&qResp.Fullname,
-		&qResp.Role,
-		&qResp.Isdisabled,
-	)
-	if err != nil {
+	var u User
+	fields := []string{"email", "username", "fullname", "role", "is_disabled"}
+	if err := db.Select(fields).Where("email = ?", vars["email"]).First(&u).Error; err != nil {
 		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	resp["userinfo"] = qResp
+	resp["userinfo"] = u
 	resp.jSend(w)
 }
 
 func getUsers(w http.ResponseWriter, r *http.Request) {
 	resp := make(Response)
 
-	type qRespType struct {
-		Email      string `json:"email"`
-		Username   string `json:"username"`
-		Fullname   string `json:"fullname"`
-		Role       string `json:"role"`
-		Isdisabled bool   `json:"isdisabled"`
-	}
-	rows, err := db.Query("select email, username, fullname, role, isdisabled from user_info;")
-	if err != nil {
+	u := make([]User, 10)
+	fields := []string{"email", "username", "fullname", "role", "is_disabled"}
+	if err := db.Select(fields).Find(&u).Error; err != nil {
 		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
 
-	var qRespSlice []qRespType
-
-	for rows.Next() {
-		var qResp qRespType
-		err := rows.Scan(&qResp.Email,
-			&qResp.Username,
-			&qResp.Fullname,
-			&qResp.Role,
-			&qResp.Isdisabled,
-		)
-		if err != nil {
-			resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		qRespSlice = append(qRespSlice, qResp)
-	}
-
-	resp["users"] = qRespSlice
+	resp["users"] = u
 	resp.jSend(w)
 }
 
@@ -196,7 +153,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 
-	err = bodyToJson(w, r, &data)
+	err = decodeJsonBody(w, r, &data)
 	if err != nil {
 		return
 	}
@@ -208,31 +165,18 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//Process request
-	var qResp struct {
-		Username   string
-		Hash       string
-		Salt       string
-		Role       string
-		Isdisabled bool
-	}
-	err = db.QueryRow("select username, passwordhash, passwordsalt, role, isdisabled from user_info where email = $1;",
-		data.Email,
-	).Scan(&qResp.Username,
-		&qResp.Hash,
-		&qResp.Salt,
-		&qResp.Role,
-		&qResp.Isdisabled,
-	)
-	if err != nil {
+	var u User
+	fields := []string{"username", "password_hash", "password_salt", "role", "is_disabled"}
+	if err := db.Select(fields).Where("email = ?", data.Email).First(&u).Error; err != nil {
 		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	//TODO route to special page if user is disabled
 
-	saltedPassword := qResp.Salt + data.Password
+	saltedPassword := u.PasswordSalt + data.Password
 
-	err = bcrypt.CompareHashAndPassword([]byte(qResp.Hash), []byte(saltedPassword))
+	err = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(saltedPassword))
 	if err != nil {
 		switch err {
 		case bcrypt.ErrMismatchedHashAndPassword:
@@ -249,7 +193,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session.Values["accessLevel"] = qResp.Role
+	session.Values["accessLevel"] = u.Role
 	session.Values["logged"] = "true"
 	session.Values["language"] = "en-us"
 
