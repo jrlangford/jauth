@@ -68,6 +68,7 @@ func postUser(w http.ResponseWriter, r *http.Request) {
 		Username   string `json:"username"`
 		Fullname   string `json:"fullname"`
 		Password   string `json:"password"`
+		Role       string `json:"role"`
 		IsDisabled bool   `json:"isdisabled"`
 	}
 
@@ -85,6 +86,10 @@ func postUser(w http.ResponseWriter, r *http.Request) {
 
 		resp.jSendError(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
+	}
+
+	if data.Role != "admin" {
+		data.Role = "user"
 	}
 
 	//TODO validate password complies with security standards
@@ -105,12 +110,13 @@ func postUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = db.Exec("insert into user_info (email, username, fullname, passwordhash, passwordsalt, isdisabled) values ($1, $2, $3, $4, $5, $6);",
+	_, err = db.Exec("insert into user_info (email, username, fullname, passwordhash, passwordsalt, role, isdisabled) values ($1, $2, $3, $4, $5, $6, $7);",
 		data.Email,
 		data.Username,
 		data.Fullname,
 		hash,
 		salt,
+		data.Role,
 		data.IsDisabled,
 	)
 	if err != nil {
@@ -133,18 +139,6 @@ func getUserByEmail(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	resp := make(Response)
 
-	session, err := store.Get(r, "jdata")
-	if err != nil {
-		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if session.Values["logged"] != "true" &&
-		session.Values["accessLevel"] != "user" {
-		resp.jSendError(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return
-	}
-
 	if vars["email"] == "" {
 		resp.jSendError(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
@@ -154,13 +148,15 @@ func getUserByEmail(w http.ResponseWriter, r *http.Request) {
 		Email      string `json:"email"`
 		Username   string `json:"username"`
 		Fullname   string `json:"fullname"`
+		Role       string `json:"role"`
 		Isdisabled bool   `json:"isdisabled"`
 	}
-	err = db.QueryRow("select email, username, fullname, isdisabled from user_info where email = $1;",
+	err := db.QueryRow("select email, username, fullname, role, isdisabled from user_info where email = $1;",
 		vars["email"],
 	).Scan(&qResp.Email,
 		&qResp.Username,
 		&qResp.Fullname,
+		&qResp.Role,
 		&qResp.Isdisabled,
 	)
 	if err != nil {
@@ -169,6 +165,44 @@ func getUserByEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp["userinfo"] = qResp
+	resp.jSend(w)
+}
+
+func getUsers(w http.ResponseWriter, r *http.Request) {
+	resp := make(Response)
+
+	type qRespType struct {
+		Email      string `json:"email"`
+		Username   string `json:"username"`
+		Fullname   string `json:"fullname"`
+		Role       string `json:"role"`
+		Isdisabled bool   `json:"isdisabled"`
+	}
+	rows, err := db.Query("select email, username, fullname, role, isdisabled from user_info;")
+	if err != nil {
+		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var qRespSlice []qRespType
+
+	for rows.Next() {
+		var qResp qRespType
+		err := rows.Scan(&qResp.Email,
+			&qResp.Username,
+			&qResp.Fullname,
+			&qResp.Role,
+			&qResp.Isdisabled,
+		)
+		if err != nil {
+			resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		qRespSlice = append(qRespSlice, qResp)
+	}
+
+	resp["users"] = qRespSlice
 	resp.jSend(w)
 }
 
@@ -192,6 +226,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		resp.jSend(w)
 		return
 	}
+	//TODO define if old sessions should be updated in case session format has changed between logs
 
 	//Read request parameters
 	var data struct {
@@ -216,13 +251,15 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		Username   string
 		Hash       string
 		Salt       string
+		Role       string
 		Isdisabled bool
 	}
-	err = db.QueryRow("select username, passwordhash, passwordsalt, isdisabled from user_info where email = $1;",
+	err = db.QueryRow("select username, passwordhash, passwordsalt, role, isdisabled from user_info where email = $1;",
 		data.Email,
 	).Scan(&qResp.Username,
 		&qResp.Hash,
 		&qResp.Salt,
+		&qResp.Role,
 		&qResp.Isdisabled,
 	)
 	if err != nil {
@@ -250,7 +287,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session.Values["accessLevel"] = "user"
+	session.Values["accessLevel"] = qResp.Role
 	session.Values["logged"] = "true"
 	session.Values["language"] = "en-us"
 

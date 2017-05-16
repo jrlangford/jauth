@@ -20,21 +20,32 @@ var r *mux.Router
 func initRouter() {
 
 	usersAndAdmins := []string{"user", "admin"}
+	//users := []string{"user"}
+	admins := []string{"admin"}
 
 	r = mux.NewRouter()
 
+	http.Handle("/", r)
+
+	//Test
 	r.HandleFunc("/cookie/save", saveSession)
 	r.HandleFunc("/cookie/read", readSession)
 
+	//User
 	r.HandleFunc("/users", postUser).Methods("POST")
-	//TODO limit endpoint access to logged in admins
-	r.HandleFunc("/users/email/{email}", getUserByEmail).Methods("GET")
 
+	//Access
 	r.HandleFunc("/login", logIn).Methods("POST")
+
+	http.Handle("/logout", auth(r, usersAndAdmins))
 	r.HandleFunc("/logout", logOut).Methods("POST")
 
-	http.Handle("/", r)
-	http.Handle("/logout", auth(r, usersAndAdmins))
+	//Admin
+	http.Handle("/admins/", auth(r, admins))
+	admin := r.PathPrefix("/admins").Subrouter()
+	admin.HandleFunc("/users/{email}", getUserByEmail).Methods("GET")
+	admin.HandleFunc("/users", getUsers).Methods("GET")
+
 }
 
 func safePing(db *sql.DB) {
