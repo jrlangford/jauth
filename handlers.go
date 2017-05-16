@@ -23,44 +23,6 @@ func generateSecureRandomBytes(n int) (string, error) {
 	return out, nil
 }
 
-func auth(next http.Handler, accessLevels []string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Verifying credentials")
-
-		resp := make(Response)
-
-		session, err := store.Get(r, "jdata")
-		if err != nil {
-			resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if session.Values["logged"] != "true" {
-			resp.jSendError(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return
-		}
-
-		levelMatch := false
-		for _, al := range accessLevels {
-			if session.Values["accessLevel"] == al {
-				levelMatch = true
-			}
-		}
-		if !levelMatch {
-			resp.jSendError(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-			return
-		}
-
-		//Renew session's ttl
-		err = sessions.Save(r, w)
-		if err != nil {
-			resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 func postUser(w http.ResponseWriter, r *http.Request) {
 
 	var data struct {
@@ -210,7 +172,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	//Verify user is not already logged in
 	resp := make(Response)
 
-	session, err := store.Get(r, "jdata")
+	session, err := store.Get(r, cookieName)
 	if err != nil {
 		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -281,7 +243,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	session, err = store.Get(r, "jdata")
+	session, err = store.Get(r, cookieName)
 	if err != nil {
 		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -290,8 +252,6 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	session.Values["accessLevel"] = qResp.Role
 	session.Values["logged"] = "true"
 	session.Values["language"] = "en-us"
-
-	log.Printf("Session: %v", session)
 
 	err = sessions.Save(r, w)
 	if err != nil {
@@ -305,7 +265,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 
 func logOut(w http.ResponseWriter, r *http.Request) {
 	resp := make(Response)
-	session, err := store.Get(r, "jdata")
+	session, err := store.Get(r, cookieName)
 	if err != nil {
 		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
 		return

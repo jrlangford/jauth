@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	"gopkg.in/boj/redistore.v1"
@@ -11,11 +12,11 @@ import (
 	"os/signal"
 )
 
-//TODO load store keys from config file or env
-var fs = "/Users/jrobin/Documents/jProjects/go/src/bitbucket.com/jrlangford/sessionsExample"
 var store *redistore.RediStore
 var db *sql.DB
 var r *mux.Router
+
+const cookieName = "jdata"
 
 func initRouter() {
 
@@ -25,7 +26,15 @@ func initRouter() {
 
 	r = mux.NewRouter()
 
-	http.Handle("/", r)
+	logH := handlers.LoggingHandler(os.Stdout, r)
+	uaH := auth(logH, usersAndAdmins)
+	aH := auth(logH, admins)
+
+	uaCorsH := handlers.CORS()(uaH)
+	aCorsH := handlers.CORS()(aH)
+	//TODO let each resource define who has acces to it instead of defining it on a route level
+
+	http.Handle("/", logH)
 
 	//Test
 	r.HandleFunc("/cookie/save", saveSession)
@@ -37,11 +46,11 @@ func initRouter() {
 	//Access
 	r.HandleFunc("/login", logIn).Methods("POST")
 
-	http.Handle("/logout", auth(r, usersAndAdmins))
+	http.Handle("/logout", uaCorsH)
 	r.HandleFunc("/logout", logOut).Methods("POST")
 
 	//Admin
-	http.Handle("/admins/", auth(r, admins))
+	http.Handle("/admins/", aCorsH)
 	admin := r.PathPrefix("/admins").Subrouter()
 	admin.HandleFunc("/users/{email}", getUserByEmail).Methods("GET")
 	admin.HandleFunc("/users", getUsers).Methods("GET")
