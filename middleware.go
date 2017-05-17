@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func auth(next http.Handler, accessLevels []string) http.Handler {
+func auth(accessLevels []string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		resp := make(Response)

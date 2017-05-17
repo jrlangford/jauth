@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 	"log"
@@ -168,8 +169,14 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	var u User
 	fields := []string{"username", "password_hash", "password_salt", "role", "is_disabled"}
 	if err := db.Select(fields).Where("email = ?", data.Email).First(&u).Error; err != nil {
-		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-		return
+		switch err {
+		case gorm.ErrRecordNotFound:
+			resp.jSendError(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		default:
+			resp.jSendError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	//TODO route to special page if user is disabled

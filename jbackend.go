@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
@@ -17,45 +16,6 @@ var db *gorm.DB
 var r *mux.Router
 
 const cookieName = "jdata"
-
-func initRouter() {
-
-	usersAndAdmins := []string{"user", "admin"}
-	//users := []string{"user"}
-	admins := []string{"admin"}
-
-	r = mux.NewRouter()
-
-	logH := handlers.LoggingHandler(os.Stdout, r)
-	uaH := auth(logH, usersAndAdmins)
-	aH := auth(logH, admins)
-
-	uaCorsH := handlers.CORS()(uaH)
-	aCorsH := handlers.CORS()(aH)
-	//TODO let each resource define who has acces to it instead of defining it on a route level
-
-	http.Handle("/", logH)
-
-	//Test
-	r.HandleFunc("/cookie/save", saveSession)
-	r.HandleFunc("/cookie/read", readSession)
-
-	//User
-	r.HandleFunc("/users", postUser).Methods("POST")
-
-	//Access
-	r.HandleFunc("/login", logIn).Methods("POST")
-
-	http.Handle("/logout", uaCorsH)
-	r.HandleFunc("/logout", logOut).Methods("POST")
-
-	//Admin
-	http.Handle("/admins/", aCorsH)
-	admin := r.PathPrefix("/admins").Subrouter()
-	admin.HandleFunc("/users/{email}", getUserByEmail).Methods("GET")
-	admin.HandleFunc("/users", getUsers).Methods("GET")
-
-}
 
 func safePing(db *gorm.DB) {
 	err := db.Exec("SELECT 1").Error
