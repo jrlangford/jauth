@@ -10,13 +10,12 @@ import (
 type Response map[string]interface{}
 
 func (resp *Response) jSend(w http.ResponseWriter) {
-	responseJson, err := json.Marshal(resp)
+	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		responseCode := http.StatusInternalServerError
-		responseJson = []byte(fmt.Sprintf("{ \"error\": \"%v\" }", err))
 		w.WriteHeader(responseCode)
+		log.Printf("err: jSend: %s", err.Error())
 	}
-	fmt.Fprintf(w, "%s", string(responseJson))
 }
 
 func (resp *Response) jSendError(w http.ResponseWriter, rErr string, responseCode int) {
