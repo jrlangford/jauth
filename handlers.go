@@ -233,39 +233,3 @@ func logOut(w http.ResponseWriter, r *http.Request) {
 	resp["status"] = "ok"
 	resp.jSend(w)
 }
-
-func saveSession(w http.ResponseWriter, r *http.Request) {
-	resp := make(Response)
-	resp["title"] = "This is part of the body"
-
-	session, err := store.Get(r, "session-A")
-	if err != nil {
-		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	session.Values["val1"] = "This is value number one"
-	session.Values["val2"] = "This is value number two"
-
-	err = sessions.Save(r, w)
-	if err != nil {
-		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	resp.jSend(w)
-}
-
-func readSession(w http.ResponseWriter, r *http.Request) {
-	resp := make(Response)
-
-	session, err := store.Get(r, "session-A")
-	if err != nil {
-		resp.jSendError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	resp["cookieVal1"] = session.Values["val1"].(string)
-	resp["cookieVal2"] = session.Values["val2"].(string)
-	resp.jSend(w)
-}

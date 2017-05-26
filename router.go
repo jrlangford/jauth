@@ -24,24 +24,14 @@ func initRouter() {
 	admins := cors(auth([]string{"admin"}, logH))
 
 	http.Handle("/", public)
-
-	//Test
-	r.HandleFunc("/cookie/save", saveSession)
-	r.HandleFunc("/cookie/read", readSession)
-
-	//User
 	r.HandleFunc("/users", postUser).Methods("POST")
-
-	//Access
 	r.HandleFunc("/login", logIn).Methods("POST")
 
 	http.Handle("/logout", usersAndAdmins)
 	r.HandleFunc("/logout", logOut).Methods("POST")
 
-	//Admin
 	http.Handle("/admins/", admins)
 	admin := r.PathPrefix("/admins").Subrouter()
 	admin.HandleFunc("/users/{email}", getUserByEmail).Methods("GET")
 	admin.HandleFunc("/users", getUsers).Methods("GET")
-
 }
