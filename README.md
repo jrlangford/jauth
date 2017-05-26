@@ -1,19 +1,24 @@
-# Sessions test
+# jAuth
 
-## Multiple application support
-Redis is used as key storage backend. It locks any key being used, avoiding concurrency issues.
+A microservice designed to manage users and sessions.
 
-## Test service
+## Goals
+* Allow user sign-up, sign-in
+* Allow authorized services to query user data
+* Allow authorized services to query session data
 
-### Get cookie
-curl -v -c cookie localhost:8080/cookie/save
+## Features
+* User sign-up/sign-in
+* Salted password storage
+* Automated db schema generation
+* Session data storage in Redis
 
-### Embed cookie in request
-curl -v -b cookie localhost:8080/cookie/read
+## Notes
+* Concurrent access to session data is hanled internally by Redis
 
-## References
-* Password storage: https://astaxie.gitbooks.io/build-web-application-with-golang/en/09.5.html
-* PostgresSQL driver: https://astaxie.gitbooks.io/build-web-application-with-golang/en/05.4.html
-* Naming conventions: http://stackoverflow.com/questions/4702728/relational-table-naming-convention/4703155#4703155
-* SQL injection: https://astaxie.gitbooks.io/build-web-application-with-golang/en/09.4.html
-* Secure password: https://crackstation.net/hashing-security.htm
+## TODO
+* Add unit tests
+* Load settings through configuration files
+* Return user data on log in
+* Add endpoint that returns user data if user is logged in
+* Add endpoint to set session data
